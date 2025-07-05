@@ -129,10 +129,4 @@ docker system prune -a --volumes
 
 * Los scripts de inicialización de PostgreSQL se encuentran en `postgres-init/`.
 * Los flujos de trabajo de n8n (`Final workflow.json`) están en `workflows/`.
-* El volumen `evolution_instances` mantiene los datos persistentes de Evolution API.
-
-
-
-✅ **Copia tal cual** este bloque, pégalo en tu `README.md` del repositorio, ¡y listo!
-Si quieres después agregar badges, documentación de endpoints o diagramas de arquitectura, avísame y te ayudo a generarlos también.
-
+* El volumen `evolution_instances` mantiene los datos persistentes 
