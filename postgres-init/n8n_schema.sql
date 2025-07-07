@@ -1,10 +1,11 @@
--- debes conectarte primero a la base n8n
+-- ================================================
+-- CONEXIÓN A LA BASE DE DATOS
+-- ================================================
 \connect n8n;
+
 -- ================================================
 -- FUNCIONES OPCIONALES DE LIMPIEZA (si existen antes)
 -- ================================================
-
-DROP TABLE IF EXISTS chats CASCADE;
 DROP TABLE IF EXISTS subcategories CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -33,7 +34,6 @@ CREATE TABLE categories (
 -- ================================================
 -- TABLA: subcategories (problemas del chatbot)
 -- ================================================
--- tabla subcategories con auto-relación
 CREATE TABLE subcategories (
     id SERIAL PRIMARY KEY,
     category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
@@ -42,31 +42,6 @@ CREATE TABLE subcategories (
     related_subcategory_id INTEGER REFERENCES subcategories(id) ON DELETE SET NULL,
     UNIQUE (category_id, name)
 );
-
--- ================================================
--- TABLA: chats
--- ================================================
-
-CREATE TABLE chats (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-    subcategory_id INTEGER REFERENCES subcategories(id) ON DELETE SET NULL,
-    location_name TEXT,   -- nombre de la locación asociada
-    device TEXT,          -- dispositivo asociado
-    summary TEXT,         -- resumen del problema
-    status TEXT DEFAULT 'open',
-    solution_gived BOOLEAN DEFAULT FAlSE, -- si se ha dado una solución
-    solution_feedback BOOLEAN DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    closed_at TIMESTAMP
-);
--- ================================================
--- ÍNDICES SUGERIDOS
--- ================================================
-CREATE INDEX idx_chats_user ON chats(user_id);
-CREATE INDEX idx_chats_category ON chats(category_id);
-CREATE INDEX idx_chats_subcategory ON chats(subcategory_id);
 
 -- ================================================
 -- CARGA DE DATOS DEMO
@@ -79,7 +54,7 @@ VALUES
   ('ingreso_vehicular', 'Accesos vehiculares'),
   ('aplicacion', 'Problemas con la aplicación'),
   ('cctv', 'Videovigilancia'),
-  ('otro', 'Otros problemas');
+  ('otro', 'Que hago en caso de');
 
 -- subcategorías (problemas) para ingreso_peatonal
 INSERT INTO subcategories (category_id, name, solution)
@@ -108,8 +83,5 @@ VALUES
   (2, 'No puedo salir', NULL),                                                                                                                            -- id 14
     (2, 'Problemas con doble validación', 'Da reversa y al volver a salir asegúrate de que las dos luces del indicador estén en verde');                  -- id 15
 
+
    
-
-UPDATE subcategories SET related_subcategory_id = 9 WHERE id IN (10,11,12,13);
-UPDATE subcategories SET related_subcategory_id = 14 WHERE id IN (10,11,12,15);
-

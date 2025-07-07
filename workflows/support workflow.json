@@ -1,0 +1,1585 @@
+{
+  "name": "support workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "import json\nimport base64\nfrom Crypto.Cipher import AES\nfrom Crypto.Hash import SHA256\nfrom Crypto.Util.Padding import pad\n\n\ndata = dict(_json.data)\nif data[\"location\"]==\"undefined\":\n  data[\"location\"]=None\n  \n# Configuración\npassphrase = _json.encrypt_key\niv_base64 = \"G7qeaR2Yb4DAgk92ZQHdjQ==\"\niv = base64.b64decode(iv_base64)\nkey = SHA256.new(passphrase.encode()).digest()\n\n# Serialización y padding\njson_data = json.dumps(data)\ndata_bytes = json_data.encode('utf-8')\npadded_data = pad(data_bytes, AES.block_size)\n\n# Encriptar con AES CBC\ncipher = AES.new(key, AES.MODE_CBC, iv)\nencrypted = cipher.encrypt(padded_data)\n\n# Codificar resultado en base64\nencrypted_base64 = base64.b64encode(encrypted).decode('utf-8')\n\n# Devolver el resultado a n8n\nreturn {\n    \"json\": {\n        \"data\": encrypted_base64\n    }\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1168,
+        208
+      ],
+      "id": "2831fb4e-f054-469e-904f-22086c94d759",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://evolution_api:8080/message/sendText/{{ $('Webhook').all()[0].json.body.instance}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{$env.AUTHENTICATION_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook').all()[0].json.body.data.key.remoteJid.split('@')[0]}}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -528,
+        -1216
+      ],
+      "id": "55da6a2e-d253-4ec0-a570-86c7f6f78b9e",
+      "name": "Send Message"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nlet message = \"¿Qué problema presenta?\\n\";\n\n// recorrer los problemas con su id\nitems.forEach(item => {\n  const num = item.json.id;\n  const emojiNum = num <= 10 ? `${num}️⃣` : `${num}.`;\n  message += `${emojiNum} ${item.json.description}\\n`;\n});\n\n// agregar la opción \"Otro problema\" con el siguiente número consecutivo\nconst maxId = Math.max(...items.map(i => i.json.id));\nconst otroNum = maxId + 1;\nconst emojiOtro = otroNum <= 10 ? `${otroNum}️⃣` : `${otroNum}.`;\n\n\nreturn [{ json: { message } }];\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2528,
+        -1216
+      ],
+      "id": "9457f09f-7975-4400-a585-2674e9a6be98",
+      "name": "Set defacult message"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "categories",
+          "mode": "list",
+          "cachedResultName": "categories"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2864,
+        -1120
+      ],
+      "id": "fe38787f-1a5a-4505-8704-22ee5127f024",
+      "name": "Get categories for message",
+      "credentials": {
+        "postgres": {
+          "id": "39934SKZDTFkMF5X",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7dd4d37a-268b-47f3-805a-1a51e7ca1c7e",
+                    "leftValue": "={{ $json.body.data.message.conversation }}",
+                    "rightValue": "Tengo un problema",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Start conversation"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "89331ca6-de01-4da3-a9e2-285d6f5cd0fc",
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Evaluate Conversation Active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -3088,
+        -816
+      ],
+      "id": "abdbe5e9-0977-4236-8384-f76d4c2093a9",
+      "name": "Evaluate existing or new chat"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "2ccab0a0-6677-44be-8028-6019d4a91ec6",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -3424,
+        -688
+      ],
+      "id": "1c7fd96c-5871-4db0-a677-62da65ab2f6f",
+      "name": "Webhook",
+      "webhookId": "2ccab0a0-6677-44be-8028-6019d4a91ec6"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ $json.phone }}",
+        "value": "={\n   \"name\":\"{{ $json.name }}\",\n   \"company\": \"{{ $json.company }}\",\n   \"selections\": {{ JSON.stringify($json.categorias) }},\n   \"phone\" : \"{{ $json.phone }}\",\n   \"selection\": \"category\"\n\n\n  \n}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        -848
+      ],
+      "id": "b8136c56-605e-4238-8fe1-45db0848e884",
+      "name": "Redis",
+      "credentials": {
+        "redis": {
+          "id": "p8no39EwWyExwjuW",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json[$json.selection] }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "notExists",
+                      "singleValue": true
+                    },
+                    "id": "c2149d2d-96eb-47c7-86f8-9448a9b75f23"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No  valido"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "927dd97f-e759-451a-a9bd-59d69b752fff",
+                    "leftValue": "={{ $json.location }}",
+                    "rightValue": 3,
+                    "operator": {
+                      "type": "object",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "get location"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "09c05c0d-91a4-4b92-87a2-ed32b4ee5e47",
+                    "leftValue": "={{ $json.selection }}",
+                    "rightValue": "location",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Location"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "89a1e0d5-3f0b-4082-b21a-669265841623",
+                    "leftValue": "={{ $json.selection }}",
+                    "rightValue": "category",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Se actualiza categoria"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e7643825-bb98-4f74-941b-0d49b7b284fa",
+                    "leftValue": "={{ $json.selection }}",
+                    "rightValue": "subcategory",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Subcategoria  se actualiza"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0ac04fe3-1063-455f-a4ca-0be439d7d6ea",
+                    "leftValue": "={{ $json.selection }}",
+                    "rightValue": "gived_solution",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Solution gived"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1ac52343-1547-4123-af6b-e1872c0bbf01",
+                    "leftValue": "={{ $json.selection }}",
+                    "rightValue": "escalated problem",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -2272,
+        -768
+      ],
+      "id": "fbf6549a-1ec6-431c-8e28-bd44c2303cff",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nlet message = \"¿Con qué se relaciona el problema?\\n\";\n\n// enumerar todas las opciones\nitems.forEach((item, index) => {\n  const num = index + 1;\n  const emojiNum = num <= 10 ? `${num}️⃣` : `${num}.`;\n  message += `${emojiNum} ${item.json.name}\\n`;\n});\n\n// agregar la opción \"Otro problema\"\nconst otroNum = items.length + 1;\nconst emojiOtro = otroNum <= 10 ? `${otroNum}️⃣` : `${otroNum}.`;\nmessage += `${emojiOtro} Otro problema`;\n\nreturn [{ json: { message } }];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -848
+      ],
+      "id": "e5fb65f8-4218-4fd1-8141-bcbbf91baf4e",
+      "name": "Set defacult message1"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ $json.phone }}",
+        "value": "={{ JSON.stringify($input.item.json) }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        -944
+      ],
+      "id": "e62ae232-6069-4a7e-a8e1-d389aa9ea9bf",
+      "name": "Redis2",
+      "credentials": {
+        "redis": {
+          "id": "p8no39EwWyExwjuW",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const selections = items.map(item => item.json);\nconst data = $(\"Jsonfy info\").first().json;\n\n// Asegurar que data.location exista (si no, se crea como objeto vacío)\nif (!data.location) {\n  data.location = {};\n}\n\nconst selection = \"subcategory\";\ndata.selection = selection;\ndata.selections = selections;\n\nreturn [data];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -688
+      ],
+      "id": "27a13a3a-4f99-4f98-ad6c-af5d3d7ac1b7",
+      "name": "Code2"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "={{ $json.body.data.key.remoteJid.split('@')[0] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -2928,
+        -624
+      ],
+      "id": "39c77a1c-755d-459c-9db1-e53c171edc50",
+      "name": "Get User Info",
+      "credentials": {
+        "redis": {
+          "id": "p8no39EwWyExwjuW",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fa02de52-1a07-40eb-93b6-fa26d5f837ea",
+              "leftValue": "={{ $json.propertyName }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2720,
+        -544
+      ],
+      "id": "a7e20843-ec7d-4db1-84be-db86d2e19406",
+      "name": "Evaluate if conversation Active"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawJson = items[0].json.propertyName;\nconst answer = $('Webhook').first().json.body.data.message.conversation || null;\nconst photo =  $('Webhook').first().json.body.data.message.imageMessage?.jpegThumbnail || null;\n// parseamos\nconst parsed = JSON.parse(rawJson);\n// clonamos todo parsed MENOS selections\nconst { selections, ...rest } = parsed;\nif (parsed.gived_solution) {\n\n  \n\n  \n  return [\n    {\n      json: {\n        ...rest,\n        \"escalated problem\":{ esclaed_text: answer,\n        escaled_photo : photo}\n        \n      }\n    }\n  ];\n}\nif (parsed.selections.length < Number(answer)) {\n  rest.selection=\"gived_solution\"\n  if (!rest.location) {\n    rest.location = {};\n  }\n  \n  return [\n    {\n      json: {\n        ...rest,\n        gived_solution: {\n          id: 2,\n          name: \"escalado\"\n        }\n      }\n    }\n  ];\n}\n\n\n// buscamos la categoría seleccionada\nconst selected = parsed.selections[Number(answer) - 1];\n\n// armamos la clave dinámica\nconst selectionKey = parsed.selection;\n\n\n\nreturn [\n  {\n    json: {\n      ...rest,\n      selection_id: answer,\n      [selectionKey]: selected\n        ? {\n            id: selected.id,\n            name: selected.name,\n          solution:  selected.solution,\n          description: selected.description\n          }\n        : null\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2480,
+        -656
+      ],
+      "id": "a8a5fe78-c09d-4bf9-817f-b399a90546b2",
+      "name": "Jsonfy info"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "subcategories",
+          "mode": "list",
+          "cachedResultName": "subcategories"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "category_id",
+              "value": "={{ $json.category.id }}"
+            },
+            {
+              "column": "related_subcategory_id",
+              "condition": "IS NULL"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1488,
+        -656
+      ],
+      "id": "920de8d3-aea0-47f0-b8e0-c3b5c5817901",
+      "name": "First categories level",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "39934SKZDTFkMF5X",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "subcategories",
+          "mode": "list",
+          "cachedResultName": "subcategories"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "related_subcategory_id",
+              "value": "={{ $json.subcategory.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1504,
+        -496
+      ],
+      "id": "cfc25ea0-c443-4802-8ec5-68956ce5c952",
+      "name": "First categories level1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "39934SKZDTFkMF5X",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "35996b38-db9a-4a1c-beb9-9fe9ffb59372",
+              "leftValue": "={{ $json.subcategory.solution }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1840,
+        -400
+      ],
+      "id": "9adba01c-fe35-4e0c-bbcc-20ebdfa6c25a",
+      "name": "!Has solution"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data =$(\"Jsonfy info\").first().json\nconst selection =\"gived_solution\"\ndata.selection =selection\ndata.selections =[{ \"id\":1, \"name\":\"solucionado\"},{ \"id\":2, \"name\":\"escalado\"}]\nreturn [\n  data\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -384
+      ],
+      "id": "1dd58e59-6f11-43e5-bf30-f37975e4926b",
+      "name": "Code3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a595836-692c-4dc8-bb44-6630eea906f0",
+              "name": "message",
+              "value": "=*Soluciones recomendada:*\n-{{ $json.subcategory.solution.replace(/\\\\n/g, \"\\n-\") }}\n\n¿Te sirvió la respuesta?\n1️⃣ Sí\n2️⃣ No",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -480,
+        32
+      ],
+      "id": "851c2a72-e892-4549-9f2e-e5625426bbf6",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://evolution_api:8080/message/sendText/{{ $('Webhook').all()[0].json.body.instance}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{$env.AUTHENTICATION_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook').all()[0].json.body.data.key.remoteJid.split('@')[0]}}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        -368
+      ],
+      "id": "d707725c-29b3-4862-a8f1-fdefbf117b08",
+      "name": "Send Message1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1b1b1906-5eba-4b15-8b19-d56941daf621",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1232,
+        -496
+      ],
+      "id": "7e4d8b3c-958c-46de-8123-21bd26560369",
+      "name": "validate category"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data =$(\"Jsonfy info\").first().json\nconst selection =\"escalated problem\"\ndata.selection =selection\n\nif (!data.location) {\n  data.location = {};\n}\nif(!data.gived_solution){\n  data[\"gived_solution\"]={\n          id: 2,\n          name: \"escalado\"\n        }\n  \n}\n\nreturn [\n  data\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -240
+      ],
+      "id": "6da86024-5eca-4fc7-9ee9-e2d0b70c5b2c",
+      "name": "Code4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a595836-692c-4dc8-bb44-6630eea906f0",
+              "name": "message",
+              "value": "=🔔 *Vamos a escalar tu caso con nuestro equipo de asesores.*\n\nPor favor envíanos *un audio*, *una imagen* o *descríbenos detalladamente* qué está sucediendo para poder ayudarte de la mejor forma posible. ✅\n\n¡*Gracias por tu paciencia*! 🙏\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -480,
+        -176
+      ],
+      "id": "4ddb54a9-23f7-4257-a982-606d2f1b0a9f",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2c77e74e-be67-4958-bd47-c75d820659ca",
+              "leftValue": "={{ $json.gived_solution.id }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1840,
+        -288
+      ],
+      "id": "e4d6fb91-c50b-48d0-a972-87ffe8eea8be",
+      "name": "Evaluate escalation"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "101a23e3-f42f-4032-bc19-186665df1cf9",
+              "name": "message",
+              "value": "✅ ¡Hemos terminado!  Gracias por confiar en nosotros para ayudarte. 🙌   Si vuelves a necesitar asistencia, no dudes en escribirnos.   ¡Que tengas un excelente día! 🌟",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -512,
+        208
+      ],
+      "id": "49383ee4-f5b6-4327-9184-5c8aa7f1d3e4",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://evolution_api:8080/message/sendText/{{ $('Webhook').all()[0].json.body.instance}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{$env.AUTHENTICATION_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook').all()[0].json.body.data.key.remoteJid.split('@')[0]}}"
+            },
+            {
+              "name": "text",
+              "value": "=💬 Gracias por tu mensaje\n📌 Un asesor se pondrá en contacto contigo lo más pronto posible.\n✅ ¡Estamos atentos para ayudarte!"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2144,
+        -144
+      ],
+      "id": "d3d53edf-0774-433c-8ed5-5f614b33f704",
+      "name": "Send Message2"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ $json.phone }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1680,
+        64
+      ],
+      "id": "7073a8e0-d452-41ff-9c15-57ce900d9993",
+      "name": "Delete",
+      "credentials": {
+        "redis": {
+          "id": "p8no39EwWyExwjuW",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data =$(\"Jsonfy info\").first().json\nconst selection =\"escalated problem\"\ndata.selection =selection\n\nif (!data.location) {\n  data.location = {};\n}\n\ndata[\"gived_solution\"]={\n          id: 2,\n          name: \"escalado\"\n        }\nreturn [\n  data\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -528
+      ],
+      "id": "3fd51524-ffe0-4e96-94ec-d65694095ee7",
+      "name": "Code5"
+    },
+    {
+      "parameters": {
+        "url": "=https://solutions.fusepong.com/api/app/company/group_device_names_by_location?company_name={{$json.company}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1888,
+        -880
+      ],
+      "id": "2dbf05c3-dc9c-473e-90cb-3029906a2fb5",
+      "name": "HTTP Request",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtener el objeto base desde el nodo \"Jsonfy info\"\nconst data = $('Jsonfy info').first().json;\nconst category_id = data.category.id;\n\nlet selection = null;\nlet selections = [];\n\n// Obtener el objeto que contiene las locaciones según category_id\nlet locationData = null;\n\nif (category_id === 1) {\n  selection = \"location\";\n  locationData = $input.first().json.access_with_zero_or_one_scan_peripheral;\n} else if (category_id === 2) {\n  selection = \"location\";\n  locationData = $input.first().json.access_with_multiple_scan_peripherals;\n} else if (category_id === 4) {\n  selection = \"location\";\n  locationData = $input.first().json.cameras;\n} else {\n  selection = \"undefined\";\n  locationData = {};\n}\n\n// Convertir las keys en array de objetos: [{ name: \"loc1\" }, { name: \"loc2\" }]\nselections = Object.keys(locationData).map(loc => ({ name: loc }));\n\n// Agregar al objeto principal\ndata.selection = selection;\ndata.selections = selections;\n\n// Retornar el objeto modificado\nreturn [data];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1664,
+        -1008
+      ],
+      "id": "284c1ecf-288a-4948-9469-3af6bcacba3a",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.selections;\n\nlet message = \"En que locacion presenta problema?\\n\";\n\n// enumerar todas las opciones\nitems.forEach((item, index) => {\n  const num = index + 1;\n  const emojiNum = num <= 10 ? `${num}️⃣` : `${num}.`;\n  message += `${emojiNum} ${item.name}\\n`;\n});\n\nreturn [{ json: { message } }];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        -1088
+      ],
+      "id": "c4708fce-3437-4935-8f06-d25e9a09db7f",
+      "name": "Set defacult message2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d71f969d-65c2-4475-b6dc-e32b5fb3a352",
+              "leftValue": "={{ $json.selections }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1472,
+        -944
+      ],
+      "id": "e87948a3-8052-422e-9b53-329ce6486f97",
+      "name": "Validate if has selections"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5dab3da0-9998-49f1-8b19-c07fc1000e8c",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1248,
+        -736
+      ],
+      "id": "04f0ce82-a93e-43d4-88d7-80f8de3025d4",
+      "name": "Validate if category has subcategories"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://evolution_api:8080/message/sendText/{{ $('Webhook').all()[0].json.body.instance}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{$env.AUTHENTICATION_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook').all()[0].json.body.data.key.remoteJid.split('@')[0]}}"
+            },
+            {
+              "name": "text",
+              "value": "=⚠️ Respuesta inválida\n❌ No pudimos procesar tu solicitud.\n🔁 Por favor, vuelve a intentarlo."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2160,
+        -1104
+      ],
+      "id": "a1724c94-f6b0-4889-9470-69962b32fd49",
+      "name": "Send Message3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://staging.fusepong.com/api/support_requirements/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -880,
+        320
+      ],
+      "id": "f492f5dd-ab64-479e-aec9-174226b2534d",
+      "name": "HTTP Request1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"data\": {\n    \"company_name\": \"{{ $json.company }}\",\n    \"support_category\": \"{{ $json.category.description }}\",\n    \"location\":  \"{{ $json.location.name}}\",\n    \"phone\": \"{{ $json.phone }}\",\n    \"name\": \"{{ $json.name }}\",\n    \"etc\": \"{{ $json.gived_solution.name }}\",\n    \"summary_problem\": \"{{ $json['escalated problem'].esclaed_text }}\",\n    \"solution_feedback\": {{ $json.gived_solution.id === 1 ? \"true\" : \"false\" }}\n  },\n  \"encrypt_key\": \"{{$env.N8N_ENCRYPTION_KEY_PYTHON_NODE}}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1424,
+        128
+      ],
+      "id": "5ae5ae70-89de-44c1-b42a-ca0afc9f750a",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const categorias = items.map(item => item.json);\nconst name =  $('Evaluate existing or new chat').first().json.body.data.pushName\nconst phone = $('Evaluate existing or new chat').first().json.body.data.key.remoteJid.split('@')[0]\n\nconst company = $('Evaluate existing or new chat').first().json.body.data.message.conversation.split(':')[1].trim() || null\nreturn [\n  {\n    json: {\n      phone,\n      name,\n      company,\n      categorias\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2672,
+        -1024
+      ],
+      "id": "7c0dd45f-5417-4204-afb8-ad0d92e843da",
+      "name": "Code6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Set defacult message": {
+      "main": [
+        [
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get categories for message": {
+      "main": [
+        [
+          {
+            "node": "Set defacult message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate existing or new chat": {
+      "main": [
+        [
+          {
+            "node": "Get categories for message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get User Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Evaluate existing or new chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send Message3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "First categories level",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "First categories level",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "!Has solution",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evaluate escalation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Message2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set defacult message1": {
+      "main": [
+        [
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "Redis2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Info": {
+      "main": [
+        [
+          {
+            "node": "Evaluate if conversation Active",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate if conversation Active": {
+      "main": [
+        [
+          {
+            "node": "Jsonfy info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jsonfy info": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First categories level": {
+      "main": [
+        [
+          {
+            "node": "Validate if category has subcategories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First categories level1": {
+      "main": [
+        [
+          {
+            "node": "validate category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "!Has solution": {
+      "main": [
+        [
+          {
+            "node": "First categories level1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code3": {
+      "main": [
+        [
+          {
+            "node": "Redis2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Send Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate category": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set defacult message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code4": {
+      "main": [
+        [
+          {
+            "node": "Redis2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Send Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate escalation": {
+      "main": [
+        [
+          {
+            "node": "Code4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Send Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code5": {
+      "main": [
+        [
+          {
+            "node": "Redis2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "First categories level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Validate if has selections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set defacult message2": {
+      "main": [
+        [
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate if has selections": {
+      "main": [
+        [
+          {
+            "node": "Redis2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set defacult message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "First categories level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate if category has subcategories": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set defacult message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code6": {
+      "main": [
+        [
+          {
+            "node": "Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "686d9ff6-418a-47c5-9a37-f91e3df62fcc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d4334f47170f337d00d212b34e13d09ea37b55496270c217c00e37181f680d5c"
+  },
+  "id": "yz4dB986u6r7Nb14",
+  "tags": []
+}
