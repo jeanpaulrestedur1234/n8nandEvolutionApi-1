@@ -83,5 +83,6 @@ VALUES
   (2, 'No puedo salir', NULL),                                                                                                                            -- id 14
     (2, 'Problemas con doble validación', 'Da reversa y al volver a salir asegúrate de que las dos luces del indicador estén en verde');                  -- id 15
 
-
+UPDATE subcategories SET related_subcategory_id = 9 WHERE id IN (10,11,12,13);
+UPDATE subcategories SET related_subcategory_id = 14 WHERE id IN (15);
    
