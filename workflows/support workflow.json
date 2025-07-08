@@ -187,7 +187,9 @@
       "parameters": {
         "operation": "set",
         "key": "={{ $json.phone }}",
-        "value": "={\n   \"name\":\"{{ $json.name }}\",\n   \"company\": \"{{ $json.company }}\",\n   \"selections\": {{ JSON.stringify($json.categorias) }},\n   \"phone\" : \"{{ $json.phone }}\",\n   \"selection\": \"category\"\n\n\n  \n}"
+        "value": "={\n   \"name\":\"{{ $json.name }}\",\n   \"company\": \"{{ $json.company }}\",\n   \"selections\": {{ JSON.stringify($json.categorias) }},\n   \"phone\" : \"{{ $json.phone }}\",\n   \"selection\": \"category\"\n\n\n  \n}",
+        "expire": true,
+        "ttl": 300
       },
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
@@ -411,7 +413,9 @@
       "parameters": {
         "operation": "set",
         "key": "={{ $json.phone }}",
-        "value": "={{ JSON.stringify($input.item.json) }}"
+        "value": "={{ JSON.stringify($input.item.json) }}",
+        "expire": true,
+        "ttl": 300
       },
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
@@ -1575,7 +1579,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "686d9ff6-418a-47c5-9a37-f91e3df62fcc",
+  "versionId": "636090fb-d286-42bd-9b70-5dcad1748799",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d4334f47170f337d00d212b34e13d09ea37b55496270c217c00e37181f680d5c"
